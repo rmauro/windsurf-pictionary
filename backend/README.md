@@ -19,9 +19,6 @@ This is the backend server for the real-time Pictionary game. It is built with F
 
 To run this project, you will need to create a `.env` file in the `backend` directory. This file stores sensitive configuration.
 
-1.  Create a new file named `.env`.
-2.  Copy the contents from `.env.example` into it.
-
 ```
 CORS_ORIGINS=http://localhost,http://localhost:3000
 ```
