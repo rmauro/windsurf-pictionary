@@ -1,5 +1,12 @@
 import React, { useRef, useEffect, useState } from 'react';
 
+// --- Data Interfaces ---
+
+interface ScoreboardPlayer {
+  name: string;
+  score: number;
+}
+
 // --- WebSocket Message Types ---
 
 interface DrawPayload {
@@ -18,6 +25,7 @@ interface GameStatePayload {
   drawer_name: string | null;
   is_drawing: boolean;
   word: string;
+  scoreboard: ScoreboardPlayer[];
 }
 
 interface NotificationPayload {
@@ -44,6 +52,22 @@ interface SetNamePayload {
 // A union type for all possible messages
 type WebSocketMessage = DrawPayload | EndPayload | ClearPayload | GameStatePayload | NotificationPayload | ChatPayload | GuessPayload | SetNamePayload;
 
+// --- Components ---
+
+const Scoreboard = ({ scores }: { scores: ScoreboardPlayer[] }) => (
+  <div className="w-full bg-white rounded-lg shadow-lg p-4">
+    <h3 className="text-lg font-bold border-b pb-2 mb-2">Scoreboard</h3>
+    <ul className="space-y-1">
+      {scores.map((player, index) => (
+        <li key={index} className="flex justify-between items-center text-sm p-1 rounded bg-gray-50">
+          <span className="font-semibold truncate pr-2">{index + 1}. {player.name}</span>
+          <span className="font-mono bg-blue-100 text-blue-800 text-xs font-semibold px-2.5 py-0.5 rounded-full">{player.score}</span>
+        </li>
+      ))}
+    </ul>
+  </div>
+);
+
 function App() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
@@ -58,6 +82,7 @@ function App() {
   const [isMyTurnToDraw, setIsMyTurnToDraw] = useState(false);
   const [wordToDraw, setWordToDraw] = useState('');
   const [currentDrawerName, setCurrentDrawerName] = useState<string | null>(null);
+  const [scoreboard, setScoreboard] = useState<ScoreboardPlayer[]>([]);
   const [gameMessages, setGameMessages] = useState<{ id: number, content: React.ReactNode }[]>([]);
   const [guess, setGuess] = useState('');
   const [myName, setMyName] = useState('');
@@ -76,17 +101,9 @@ function App() {
     const socket = new WebSocket(`${wsUrl}/ws/${clientId}`);
     setWs(socket);
 
-    socket.onopen = () => {
-      // Connection established
-    };
-
-    socket.onclose = () => {
-      // Connection closed
-    };
-
-    socket.onerror = (error) => {
-      console.error('WebSocket error:', error);
-    };
+    socket.onopen = () => { };
+    socket.onclose = () => { };
+    socket.onerror = (error) => console.error('WebSocket error:', error);
 
     socket.onmessage = (event) => {
       try {
@@ -97,6 +114,7 @@ function App() {
             setIsMyTurnToDraw(message.is_drawing);
             setWordToDraw(message.word);
             setCurrentDrawerName(message.drawer_name);
+            setScoreboard(message.scoreboard);
             break;
           case 'notification':
             setGameMessages(prev => [...prev, { id: Date.now(), content: <div className="text-sm text-gray-500 italic">{message.message}</div> }]);
@@ -120,22 +138,16 @@ function App() {
       }
     };
 
-    // Cleanup on component unmount
-    return () => {
-      socket.close();
-    };
+    return () => socket.close();
   }, [clientId]);
 
-  // Function to handle drawing based on incoming data
   const handleIncomingDrawing = (data: WebSocketMessage) => {
     if (data.type !== 'start' && data.type !== 'draw') return;
-
     const ctx = getContext();
     if (!ctx) return;
 
     const { type, x, y, color: strokeColor, lineWidth: strokeWidth } = data;
     
-    // Apply styles from the message
     ctx.strokeStyle = strokeColor;
     ctx.lineWidth = strokeWidth;
     ctx.lineCap = 'round';
@@ -150,7 +162,6 @@ function App() {
     }
   };
   
-  // Function to send data via WebSocket
   const sendWebSocketMessage = (message: WebSocketMessage) => {
     if (ws && ws.readyState === WebSocket.OPEN) {
       ws.send(JSON.stringify(message));
@@ -195,7 +206,7 @@ function App() {
   };
 
   const handleClearCanvas = () => {
-    if (!isMyTurnToDraw) return; // Only drawer can clear
+    if (!isMyTurnToDraw) return;
     const ctx = getContext();
     if (ctx && canvasRef.current) {
       ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
@@ -217,7 +228,6 @@ function App() {
     if (finalName) {
       setMyName(finalName);
       sendWebSocketMessage({ type: 'set_name', name: finalName });
-      // For a new player, this action will now trigger the game view
       if (!isInGame) {
         setIsInGame(true);
       }
@@ -267,8 +277,8 @@ function App() {
   }
 
   return (
-    <div className="flex flex-col items-center justify-center h-screen bg-gray-200 font-sans">
-      <div className="w-full max-w-6xl p-4">
+    <div className="flex flex-col items-center justify-center min-h-screen bg-gray-200 font-sans p-4">
+      <div className="w-full max-w-7xl">
         <div className="flex justify-between items-center mb-4">
           <h1 className="text-4xl font-bold text-gray-800">Pictionary Online</h1>
           <div className="text-right">
@@ -280,20 +290,23 @@ function App() {
           <GameStatus />
         </div>
         <div className="flex items-start justify-center gap-4">
-          <div className={`flex flex-col gap-4 p-4 bg-white rounded-lg shadow-lg ${!isMyTurnToDraw && 'opacity-50'}`}>
-            <fieldset disabled={!isMyTurnToDraw} className="flex flex-col gap-4 items-center">
-              <div>
-                <label htmlFor="colorPicker" className="font-semibold">Color</label>
-                <input id="colorPicker" type="color" value={color} onChange={(e) => setColor(e.target.value)} className="w-24 h-10 p-1 border-none cursor-pointer"/>
-              </div>
-              <div>
-                <label htmlFor="lineWidth" className="font-semibold">Brush Size: {lineWidth}</label>
-                <input id="lineWidth" type="range" min="1" max="50" value={lineWidth} onChange={(e) => setLineWidth(Number(e.target.value))} className="w-32 cursor-pointer"/>
-              </div>
-              <button onClick={handleClearCanvas} className="w-full px-4 py-2 mt-2 text-white bg-red-500 rounded-md hover:bg-red-600 disabled:bg-red-300">
-                Clear Canvas
-              </button>
-            </fieldset>
+          <div className="w-64 flex flex-col gap-4">
+            <Scoreboard scores={scoreboard} />
+            <div className={`flex flex-col gap-4 p-4 bg-white rounded-lg shadow-lg ${!isMyTurnToDraw && 'opacity-50'}`}>
+              <fieldset disabled={!isMyTurnToDraw} className="flex flex-col gap-4 items-center">
+                <div>
+                  <label htmlFor="colorPicker" className="font-semibold">Color</label>
+                  <input id="colorPicker" type="color" value={color} onChange={(e) => setColor(e.target.value)} className="w-24 h-10 p-1 border-none cursor-pointer"/>
+                </div>
+                <div>
+                  <label htmlFor="lineWidth" className="font-semibold">Brush Size: {lineWidth}</label>
+                  <input id="lineWidth" type="range" min="1" max="50" value={lineWidth} onChange={(e) => setLineWidth(Number(e.target.value))} className="w-32 cursor-pointer"/>
+                </div>
+                <button onClick={handleClearCanvas} className="w-full px-4 py-2 mt-2 text-white bg-red-500 rounded-md hover:bg-red-600 disabled:bg-red-300">
+                  Clear Canvas
+                </button>
+              </fieldset>
+            </div>
           </div>
           <canvas
             ref={canvasRef}

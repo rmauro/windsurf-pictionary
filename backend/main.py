@@ -31,9 +31,16 @@ async def notify_game_state():
     """Notifies all clients about the current game state."""
     drawer_id = game.get_current_drawer()
     drawer_name = game.get_player_name(drawer_id) if drawer_id else "N/A"
+    scoreboard = game.get_scoreboard()
+
+    base_state = {
+        "type": "game_state",
+        "drawer_name": drawer_name,
+        "scoreboard": scoreboard,
+    }
 
     if drawer_id is None:
-        state_message = {"type": "game_state", "drawer_name": None, "is_drawing": False, "word": ""}
+        state_message = {**base_state, "is_drawing": False, "word": ""}
         await manager.broadcast_json(state_message)
         return
 
@@ -47,8 +54,7 @@ async def notify_game_state():
                 word_to_send = " ".join("_" for _ in game.current_word)
 
         state_message = {
-            "type": "game_state",
-            "drawer_name": drawer_name,
+            **base_state,
             "is_drawing": is_drawer,
             "word": word_to_send
         }
@@ -108,6 +114,11 @@ async def websocket_endpoint(websocket: WebSocket, client_id: int):
                             continue
 
                         if guess.lower() == game.current_word.lower():
+                            game.award_point(client_id)  # Award point to guesser
+                            drawer_id = game.get_current_drawer()
+                            if drawer_id is not None:
+                                game.award_point(drawer_id)  # Award point to drawer
+
                             await manager.broadcast_json({
                                 "type": "notification",
                                 "message": f"{sender_name} guessed it! The word was: {game.current_word}"
