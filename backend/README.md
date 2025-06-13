@@ -15,6 +15,17 @@ This is the backend server for the real-time Pictionary game. It is built with F
 -   FastAPI
 -   Uvicorn (for serving)
 
+## Environment Variables
+
+To run this project, you will need to create a `.env` file in the `backend` directory. This file stores sensitive configuration.
+
+1.  Create a new file named `.env`.
+2.  Copy the contents from `.env.example` into it.
+
+```
+CORS_ORIGINS=http://localhost,http://localhost:3000
+```
+
 ## Setup and Running
 
 1.  **Navigate to the backend directory:**
@@ -29,9 +40,9 @@ This is the backend server for the real-time Pictionary game. It is built with F
     ```
     *On Windows, use `venv\Scripts\activate`*
 
-3.  **Install dependencies:**
+3.  **Install dependencies from `requirements.txt`:**
     ```bash
-    pip install fastapi "uvicorn[standard]" websockets
+    pip install -r requirements.txt
     ```
 
 4.  **Run the server:**

@@ -1,17 +1,19 @@
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 import json
+import os
+from dotenv import load_dotenv
 
 from game import Game
 from connection_manager import ConnectionManager
 
+load_dotenv()
+
 app = FastAPI()
 
 # CORS configuration
-origins = [
-    "http://localhost",
-    "http://localhost:3000",
-]
+CORS_ORIGINS = os.getenv("CORS_ORIGINS", "http://localhost,http://localhost:3000")
+origins = CORS_ORIGINS.split(',') if CORS_ORIGINS else []
 
 app.add_middleware(
     CORSMiddleware,
